@@ -8,7 +8,6 @@ This repository contains a simplified drawing tool inspired by ExcaliDraw.
 - [Installation](#installation)
 - [Usage](#usage)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## Features
 
