@@ -149,7 +149,7 @@ const getSvgPathFromStroke = stroke => {
   return d.join(" ")
 }
 
-const drawElement = (roughCanvas, context, element){
+const drawElement = (roughCanvas, context, element) => {
   switch(type){
     case "line":
     case "rectangle":
