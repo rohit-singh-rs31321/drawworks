@@ -5,6 +5,7 @@ import { IoIosUndo } from "react-icons/io";
 import { IoIosRedo } from "react-icons/io";
 import { FaPencil } from "react-icons/fa6";
 
+import getStroke from "perfect-freehand";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import rough from "roughjs/bundled/rough.esm";
 import "./App.css";
@@ -150,24 +151,27 @@ const getSvgPathFromStroke = stroke => {
 }
 
 const drawElement = (roughCanvas, context, element) => {
-  switch(type){
+  switch(element.type){
     case "line":
     case "rectangle":
       roughCanvas.draw(element.roughElement);
       break;
     case "pencil":
-      const myStroke = getSvgPathFromStroke(getStroke(element.points))
-      const pathData = getSvgPathFromStroke(myStroke)
-      const myPath = new Path2D(pathData)
-      context.fill(myPath)
+      const stroke = getSvgPathFromStroke(getStroke(element.points,
+        {size: 8}))
+      context.fill(new Path2D(stroke));
+      break;
     default:
-      throw new Error(`Type not recognised: ${type}`)
+      throw new Error(`Type not recognised: ${element.type}`)
   } 
 }
+
+const adjustmentRequired = type => ['line', 'rectangle'].includes(type);
+
 const App = () => {
   const [elements, setElements, undo, redo] = useHistory([]);
   const [action, setAction] = useState("none");
-  const [tool, setTool] = useState("pencilf");
+  const [tool, setTool] = useState("pencil");
   const [selectedElement, setSelectedElement] = useState(null);
 
   useLayoutEffect(() => {
@@ -198,10 +202,20 @@ const App = () => {
   }, [undo, redo]);
 
   const updateElement = (id, x1, y1, x2, y2, type) => {
-    const updatedElement = createElement(id, x1, y1, x2, y2, type);
-
     const elementsCopy = [...elements];
-    elementsCopy[id] = updatedElement;
+    
+    switch(type){
+      case "line":
+      case "rectangle":
+        elementsCopy[id] = createElement(id, x1, y1, x2, y2, type);
+        break;
+        case "pencil":
+          elementsCopy[id].points = [...elementsCopy[id].points, {x: x2, y:y2}]
+          break;
+        default:
+            throw new Error(`Type not Recognised: ${type}`)
+    }  
+
     setElements(elementsCopy, true);
   };
 
@@ -273,7 +287,7 @@ const App = () => {
     if (selectedElement) {
       const index = selectedElement.id;
       const { id, type } = elements[index];
-      if (action === "drawing" || action === "resizing") {
+      if ((action === "drawing" || action === "resizing") && adjustmentRequired(type)) {
         const { x1, y1, x2, y2 } = adjustElementCoordinates(elements[index]);
         updateElement(id, x1, y1, x2, y2, type);
       }
@@ -284,7 +298,7 @@ const App = () => {
 
   return (
     <div>
-      <div className="absolute top-0 z-10 w-full py-2">
+      <div className="absolute top-0 w-full z-10 px-4 py-2">
         <div class="toolbar flex justify-center items-center gap-1 py-1 px-1 w-fit mx-auto border shadow-lg rounded-2xl">
           <button onClick={() => setTool("selection")}>
             <GiArrowCursor size={"1.8rem"} />
@@ -300,7 +314,7 @@ const App = () => {
         </button>
         </div>
       </div>
-      <div className="absolute bottom-0 z-10 w-full py-2">
+      <div className="absolute bottom-0 z-10 py-2">
         <button onClick={undo}>
           <IoIosUndo size={"1.8rem"} />
         </button>
