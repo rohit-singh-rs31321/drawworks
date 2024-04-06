@@ -4,9 +4,10 @@ import { GiArrowCursor } from "react-icons/gi";
 import { IoIosUndo } from "react-icons/io";
 import { IoIosRedo } from "react-icons/io";
 import { FaPencil } from "react-icons/fa6";
+import { PiTextTBold } from "react-icons/pi";
 
 import getStroke from "perfect-freehand";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState, useRef } from "react";
 import rough from "roughjs/bundled/rough.esm";
 import "./App.css";
 
@@ -23,6 +24,8 @@ function createElement(id, x1, y1, x2, y2, type) {
     case "pencil":
       
       return {id, type, points: [{x:x1, y:y1}]}
+    case "text":
+      return{id, type, x1, y1, x2, y2, text: ""}  
     default:
       throw new Error(`Type not recognised: ${type}`)
   }      
@@ -32,25 +35,42 @@ const nearpoint = (x, y, x1, y1, name) => {
   return Math.abs(x - x1) < 5 && Math.abs(y - y1) < 5 ? name : null;
 };
 
+const onLine = (x1, y1, x2, y2, x, y, maxDistance = 1) => {
+  const a = { x: x1, y: y1 };
+    const b = { x: x2, y: y2 };
+    const c = { x, y };
+    const offset = distance(a, b) - (distance(a, c) + distance(b, c));
+    return Math.abs(offset) < maxDistance ? "inside" : null;
+}
+
 const positionWithinElement = (x, y, element) => {
   const { type, x1, x2, y1, y2 } = element;
-  if (type === "rectangle") {
-    const topLeft = nearpoint(x, y, x1, y1, "tl");
+  switch(type){
+    case "line":
+     const on = onLine(x1, y1, x2, y2, x, y);
+    const start = nearpoint(x, y, x1, y1, "start");
+    const end = nearpoint(x, y, x2, y2, "end");
+    
+    return start || end || on;
+    case "rectangle":
+      const topLeft = nearpoint(x, y, x1, y1, "tl");
     const topRight = nearpoint(x, y, x2, y1, "tr");
     const bottomLeft = nearpoint(x, y, x1, y2, "bl");
     const bottomRight = nearpoint(x, y, x2, y2, "br");
     const inside = x >= x1 && x <= x2 && y >= y1 && y <= y2 ? "inside" : null;
     return topLeft || topRight || bottomLeft || bottomRight || inside;
-  } else {
-    const a = { x: x1, y: y1 };
-    const b = { x: x2, y: y2 };
-    const c = { x, y };
-    const offset = distance(a, b) - (distance(a, c) + distance(b, c));
-    const start = nearpoint(x, y, x1, y1, "start");
-    const end = nearpoint(x, y, x2, y2, "end");
-    const inside = Math.abs(offset) < 1 ? "inside" : null;
-    return start || end || inside;
-  }
+      case "pencil":
+        const betweenAnyPoint = element.points.some((point, index) => {
+          const nextPoint = element.points[index + 1]
+          if(!nextPoint) return false;
+          return onLine(point.x, point.y, nextPoint.x, nextPoint.y, x, y, 5) != null;
+        }) 
+        return betweenAnyPoint ? "inside" : null;
+      case "text":
+        return x >= x1 && x <= x2 && y >= y1 && y <= y2 ? "inside" : null;
+      default:
+          throw new Error(`Type not Recognised: ${type}`)
+  } 
 };
 const distance = (a, b) =>
   Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
@@ -161,6 +181,10 @@ const drawElement = (roughCanvas, context, element) => {
         {size: 8}))
       context.fill(new Path2D(stroke));
       break;
+    case "text":
+      context.font = '48px Courier New';
+      context.fillText(element.text,  element.x1, element.y1);
+      break;
     default:
       throw new Error(`Type not recognised: ${element.type}`)
   } 
@@ -173,6 +197,7 @@ const App = () => {
   const [action, setAction] = useState("none");
   const [tool, setTool] = useState("pencil");
   const [selectedElement, setSelectedElement] = useState(null);
+  const textAreaRef = useRef();
 
   useLayoutEffect(() => {
     const canvas = document.getElementById("canvas");
@@ -199,9 +224,14 @@ const App = () => {
     return () => {
       document.removeEventListener("keydown", undoRedoFunction);
     };
-  }, [undo, redo]);
+}, [undo, redo]);
 
-  const updateElement = (id, x1, y1, x2, y2, type) => {
+  useEffect(() => {
+    const textArea = textAreaRef.current;
+    if(action === "writing") textArea.focus(); 
+  }, [action, selectedElement])
+
+  const updateElement = (id, x1, y1, x2, y2, type, options) => {
     const elementsCopy = [...elements];
     
     switch(type){
@@ -209,25 +239,46 @@ const App = () => {
       case "rectangle":
         elementsCopy[id] = createElement(id, x1, y1, x2, y2, type);
         break;
-        case "pencil":
-          elementsCopy[id].points = [...elementsCopy[id].points, {x: x2, y:y2}]
-          break;
-        default:
-            throw new Error(`Type not Recognised: ${type}`)
+      case "pencil":
+        elementsCopy[id].points = [...elementsCopy[id].points, {x: x2, y:y2}]
+        break;
+      case "text":
+        const textWidth = document
+        .getElementById("canvas")
+        .getContext("2d")
+        .measureText(options.text).width;
+        const textHeight = 24;
+
+        elementsCopy[id] = {
+          ...createElement(id, x1, y1, x1 + textWidth, y1 + textHeight, type),
+          text: options.text
+        }
+        break;
+      default:
+         throw new Error(`Type not Recognised: ${type}`)
     }  
 
     setElements(elementsCopy, true);
   };
 
   const handleMouseDown = (event) => {
+    if (action === "writing") return;
+
     const { clientX, clientY } = event;
     if (tool === "selection") {
       const element = getElementAPosition(clientX, clientY, elements);
       //if we are on an element
       if (element) {
-        const offsetX = clientX - element.x1;
-        const offsetY = clientY - element.y1;
-        setSelectedElement({ ...element, offsetX, offsetY });
+        if(element.type === "pencil"){
+          const xOffsets = element.points.map(point => clientX - point.x);
+          const yOffsets = element.points.map(point => clientY - point.y);
+          setSelectedElement({ ...element, xOffsets, yOffsets });
+        }else {
+          const offsetX = clientX - element.x1;
+          const offsetY = clientY - element.y1;
+          setSelectedElement({ ...element, offsetX, offsetY });
+        }
+        
         setElements((prevState) => prevState);
 
         if (element.position === "inside") {
@@ -249,7 +300,7 @@ const App = () => {
       setElements((prevState) => [...prevState, element]);
 
       setSelectedElement(element);
-      setAction("drawing");
+      setAction(tool === "text" ? "writing" : "drawing");
     }
   };
   const handleMouseMove = (event) => {
@@ -266,12 +317,23 @@ const App = () => {
       const { x1, y1 } = elements[index];
       updateElement(index, x1, y1, clientX, clientY, tool);
     } else if (action === "moving") {
-      const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
-      const width = x2 - x1;
-      const height = y2 - y1;
-      const newX1 = clientX - offsetX;
-      const newY1 = clientY - offsetY;
-      updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type);
+      if(selectedElement.type === "pencil"){
+        const newPoints = selectedElement.points.map((_, index) => ({
+            x: clientX - selectedElement.xOffsets[index],
+            y: clientY - selectedElement.yOffsets[index]  
+        }))
+        const elementsCopy = [...elements];
+    elementsCopy[selectedElement.id].points = newPoints;
+    setElements(elementsCopy, true);
+      }else{
+        const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
+        const width = x2 - x1;
+        const height = y2 - y1;
+        const newX1 = clientX - offsetX;
+        const newY1 = clientY - offsetY;
+        updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type);
+      }
+      
     } else if (action === "resizing") {
       const { id, type, position, ...coordinates } = selectedElement;
       const { x1, y1, x2, y2 } = resizedCordinates(
@@ -292,14 +354,24 @@ const App = () => {
         updateElement(id, x1, y1, x2, y2, type);
       }
     }
+
+    if(action === "writing") return;
     setAction("none");
     setSelectedElement(null);
   };
 
+  const handleBlur = event => {
+    const {id, x1, y1, type} = selectedElement;
+    setAction("none")
+    setSelectedElement(null)
+
+    updateElement(id, x1, y1, null, null, type, {text: event.target.value})
+  }
+
   return (
     <div>
-      <div className="absolute top-0 w-full z-10 px-4 py-2">
-        <div class="toolbar flex justify-center items-center gap-1 py-1 px-1 w-fit mx-auto border shadow-lg rounded-2xl">
+      <div className="absolute top-0 z-10 px-4 py-2">
+        <div className="toolbar flex justify-center items-center gap-1 py-1 px-1 w-fit mx-auto border shadow-lg rounded-2xl">
           <button onClick={() => setTool("selection")}>
             <GiArrowCursor size={"1.8rem"} />
           </button>
@@ -312,6 +384,10 @@ const App = () => {
           <button onClick={() => setTool("pencil")}>
         <FaPencil size={"1.8rem"}/>
         </button>
+          <button onClick={() => setTool("text")}>
+          <PiTextTBold size={"1.8rem"}/>
+        </button>
+
         </div>
       </div>
       <div className="absolute bottom-0 z-10 py-2">
@@ -321,8 +397,13 @@ const App = () => {
         <button onClick={redo}>
           <IoIosRedo size={"1.8rem"} />
         </button>
-        
       </div>
+      { action === "writing" ?(
+        <textarea 
+        ref={textAreaRef}
+        onBlur={handleBlur}
+        className="fixed" style={{left: selectedElement.x1, top: selectedElement.y1}}/> 
+        ) : null}
       <canvas
         id="canvas"
         width={window.innerWidth}
