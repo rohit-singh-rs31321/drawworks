@@ -54,6 +54,15 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+.links a {
+  color: black;
+  transition: transform 0.2s ease-in-out;
+}
+.links a:hover {
+  transform: scale(1.1); 
+  color: rgb(77, 77, 78);
+}
+
 
 @media (prefers-color-scheme: light) {
   :root {

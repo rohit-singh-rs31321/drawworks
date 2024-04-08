@@ -5,6 +5,8 @@ import { IoIosUndo } from "react-icons/io";
 import { IoIosRedo } from "react-icons/io";
 import { FaPencil } from "react-icons/fa6";
 import { PiTextTBold } from "react-icons/pi";
+import { HiOutlineDownload } from "react-icons/hi";
+
 
 import getStroke from "perfect-freehand";
 import React, { useEffect, useLayoutEffect, useState, useRef } from "react";
@@ -226,7 +228,11 @@ const App = () => {
   const [panOffset, setPanOffset] = React.useState({ x: 0, y: 0 });
   const [startPanMousePosition, setStartPanMousePosition] = React.useState({ x: 0, y: 0 });
   const [selectedElement, setSelectedElement] = useState(null);
+  const [scale, setScale] =React.useState(1);
+  const [scaleOffet, setScaleOffset] =React.useState({x :0, y:0});
+
   const textAreaRef = useRef();
+  const canvasRef = useRef(null);
   const pressedKeys = usePressedkeys();
 
   useLayoutEffect(() => {
@@ -236,14 +242,23 @@ const App = () => {
 
     context.clearRect(0, 0, canvas.width, canvas.height);
 
+    const scaleWidth = canvas.width * scale;
+    const scaleHeight = canvas.height * scale;
+    const scaleOffsetX = (scaleWidth - canvas.width)/2;
+    const scaleOffsetY = (scaleHeight - canvas.height) /2;
+    setScaleOffset({x: scaleOffsetX, y : scaleOffsetY})
+
     context.save();
-    context.translate(panOffset.x, panOffset.y);
+    context.translate(panOffset.x * scale - scaleOffsetX, panOffset.y * scale - scaleOffsetY);
+    
+    context.scale(scale, scale);
+
     elements.forEach(element => {
       if (action === "writing" && selectedElement.id === element.id) return;
       drawElement(roughCanvas, context, element)
     });
     context.restore();
-  }, [elements, action, selectedElement, panOffset]);
+  }, [elements, action, selectedElement, panOffset, scale]);
 
   useEffect(() => {
     const undoRedoFunction = (event) => {
@@ -262,17 +277,19 @@ const App = () => {
     };
   }, [undo, redo]);
   useEffect(() => {
-    const panFunction = event => {
+    const panOrZoomFunction = event => {
+      if(pressedKeys.has("Meta") || pressedKeys.has("Control")) onZoom(event.deltaY * -0.01);
+      else
       setPanOffset(prevState => ({
         x: prevState.x - event.deltaX,
         y: prevState.y - event.deltaY
       }));
     };
-    document.addEventListener("wheel", panFunction);
+    document.addEventListener("wheel", panOrZoomFunction);
     return () => {
-      document.removeEventListener("wheel", panFunction);
+      document.removeEventListener("wheel", panOrZoomFunction);
     };
-  }, []);
+  }, [pressedKeys]);
 
   useEffect(() => {
     const textArea = textAreaRef.current;
@@ -315,8 +332,8 @@ const App = () => {
   };
 
   const getMouseCoordinates = event => {
-    const clientX = event.clientX - panOffset.x;
-    const clientY = event.clientY - panOffset.y;
+    const clientX = (event.clientX - panOffset.x * scale + scaleOffet.x) / scale;
+    const clientY = (event.clientY - panOffset.y * scale + scaleOffet.y) / scale;
     return { clientX, clientY };
   }
 
@@ -454,29 +471,49 @@ const App = () => {
     updateElement(id, x1, y1, null, null, type, { text: event.target.value })
   }
 
+  const onZoom = delta => {
+    setScale(prevState => Math.min(Math.max(prevState + delta, 0.1), 20));
+  };
+
+  const saveImageToLocal = (event) => {
+    let link = event.currentTarget;
+    link.setAttribute("download", "canvas.png");
+    let image = canvasRef.current.toDataURL('image/png');
+    link.setAttribute( 'href', image );
+
+  }
+
   return (
     <div>
       <div className="fixed top-0 left-1/3 z-20 px-4 py-2">
-        <div className="toolbar flex justify-center items-center gap-1 py-1 px-1 w-fit mx-auto border shadow-lg rounded-2xl">
-          <button onClick={() => setTool("selection")}>
+        <div className="toolbar links flex justify-center items-center gap-7 py-4 px-5 w-fit mx-auto border shadow-lg rounded-2xl">
+          <a onClick={() => setTool("selection")} >
             <GiArrowCursor size={"1.8rem"} />
-          </button>
-          <button onClick={() => setTool("line")}>
+          </a>
+          <a onClick={() => setTool("line")}>
             <FaLongArrowAltRight size={"1.8rem"} />
-          </button>
-          <button onClick={() => setTool("rectangle")}>
+          </a>
+          <a onClick={() => setTool("rectangle")}>
             <TbRectangle size={"1.8rem"} />
-          </button>
-          <button onClick={() => setTool("pencil")}>
+          </a>
+          <a onClick={() => setTool("pencil")}>
             <FaPencil size={"1.8rem"} />
-          </button>
-          <button onClick={() => setTool("text")}>
+          </a>
+          <a onClick={() => setTool("text")}>
             <PiTextTBold size={"1.8rem"} />
-          </button>
+          </a>
+          <a href="download_link" onClick={saveImageToLocal} className="color: #f1f5f9;">
+          <HiOutlineDownload size={"1.8rem"} /></a>
+          
+
 
         </div>
       </div>
       <div className="fixed bottom-0 z-20 py-2">
+        <button onClick={() =>onZoom(-0.1) }>-</button>
+        <span onClick={() =>setScale(1) }>{new Intl.NumberFormat("dn-GB", {style: "percent"}).format(scale)}</span>
+        <button onClick={() =>onZoom(+0.1) }>+</button>
+        <span> </span>
         <button onClick={undo}>
           <IoIosUndo size={"1.8rem"} />
         </button>
@@ -505,6 +542,7 @@ const App = () => {
       ) : null}
       <canvas
         id="canvas"
+        ref={canvasRef}
         width={window.innerWidth}
         height={window.innerHeight}
         onMouseDown={handleMouseDown}
