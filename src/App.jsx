@@ -7,7 +7,6 @@ import { FaPencil } from "react-icons/fa6";
 import { PiTextTBold } from "react-icons/pi";
 import { HiOutlineDownload } from "react-icons/hi";
 
-
 import getStroke from "perfect-freehand";
 import React, { useEffect, useLayoutEffect, useState, useRef } from "react";
 import rough from "roughjs/bundled/rough.esm";
@@ -22,7 +21,7 @@ function createElement(id, x1, y1, x2, y2, type) {
       const roughElement = type === "line"
         ? generator.line(x1, y1, x2, y2)
         : generator.rectangle(x1, y1, x2 - x1, y2 - y1);
-      return { id, x1, y1, x2, y2, type, roughElement };
+      return { id, x1, y1, x2, y2, type, roughElement};
     case "pencil":
 
       return { id, type, points: [{ x: x1, y: y1 }] }
@@ -509,7 +508,7 @@ const App = () => {
 
         </div>
       </div>
-      <div className="fixed bottom-0 z-20 py-2">
+      <div className="fixed bottom-0  flex justify-center items-center gap-2 z-20 py-2 px-2">
         <button onClick={() =>onZoom(-0.1) }>-</button>
         <span onClick={() =>setScale(1) }>{new Intl.NumberFormat("dn-GB", {style: "percent"}).format(scale)}</span>
         <button onClick={() =>onZoom(+0.1) }>+</button>
