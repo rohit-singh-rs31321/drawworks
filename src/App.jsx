@@ -1,6 +1,7 @@
 import { TbRectangle } from "react-icons/tb";
-import { FaLongArrowAltRight } from "react-icons/fa";
-import { GiArrowCursor } from "react-icons/gi";
+import { IoRemoveOutline } from "react-icons/io5";
+import { BiPointer } from "react-icons/bi";
+
 import { IoIosUndo } from "react-icons/io";
 import { IoIosRedo } from "react-icons/io";
 import { FaPencil } from "react-icons/fa6";
@@ -482,27 +483,64 @@ const App = () => {
 
   }
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      switch (event.key) {
+        case "1":
+          setTool("selection");
+          break;
+        case "2":
+          setTool("line");
+          break;
+        case "3":
+          setTool("rectangle");
+          break;
+        case "4":
+          setTool("pencil");
+          break;
+        case "5":
+          setTool("text");
+          break;
+        default:
+          break;
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+  const toolClass = (selectedTool) => {
+    return tool === selectedTool ? "bg-teal-200 text-teal-700 shadow-lg rounded-sm" : "";
+  };
+
   return (
     <div>
-      <div className="fixed top-0 left-1/3 z-20 px-4 py-2">
-        <div className="toolbar links flex justify-center items-center gap-7 py-4 px-5 w-fit mx-auto border shadow-lg rounded-2xl">
-          <a onClick={() => setTool("selection")} >
-            <GiArrowCursor size={"1.8rem"} />
+      <div className="fixed top-0 left-1/3 right-1/3 z-20 px-4 py-2">
+        <div className="toolbar links flex justify-center items-center  bg-slate-50 gap-7 py-2 px-5 w-fit mx-auto border shadow-lg rounded-lg">
+          <a className={toolClass("selection")} onClick={() => setTool("selection")} >
+            <BiPointer size={"1.2rem"} />
+            <span className="absolute ml-5 top-7 text-xxs">1</span>
           </a>
-          <a onClick={() => setTool("line")}>
-            <FaLongArrowAltRight size={"1.8rem"} />
+          <a className={toolClass("line")} onClick={() => setTool("line")}>
+          <IoRemoveOutline size={"1.3rem"} />
+            <span className="absolute ml-5 top-7 text-xxs">2</span>
           </a>
-          <a onClick={() => setTool("rectangle")}>
-            <TbRectangle size={"1.8rem"} />
+          <a className={toolClass("rectangle")} onClick={() => setTool("rectangle")}>
+            <TbRectangle size={"1.3rem"} />
+            <span className="absolute ml-5 top-7 text-xxs">3</span>
           </a>
-          <a onClick={() => setTool("pencil")}>
-            <FaPencil size={"1.8rem"} />
+          <a className={toolClass("pencil")} onClick={() => setTool("pencil")}>
+            <FaPencil size={"1.3rem"} />
+            <span className="absolute ml-5 top-7 text-xxs">4</span>
           </a>
-          <a onClick={() => setTool("text")}>
-            <PiTextTBold size={"1.8rem"} />
+          <a className={toolClass("text")} onClick={() => setTool("text")}>
+            <PiTextTBold size={"1.3rem"} />
+            <span className="absolute ml-5 top-7 text-xxs">5</span>
           </a>
           <a href="download_link" onClick={saveImageToLocal} className="color: #f1f5f9;">
-          <HiOutlineDownload size={"1.8rem"} /></a>
+          <HiOutlineDownload size={"1.3rem"} /></a>
           
 
 
@@ -514,10 +552,10 @@ const App = () => {
         <button onClick={() =>onZoom(+0.1) }>+</button>
         <span> </span>
         <button onClick={undo}>
-          <IoIosUndo size={"1.8rem"} />
+          <IoIosUndo size={"1.3rem"} />
         </button>
         <button onClick={redo}>
-          <IoIosRedo size={"1.8rem"} />
+          <IoIosRedo size={"1.3rem"} />
         </button>
       </div>
       {action === "writing" ? (
