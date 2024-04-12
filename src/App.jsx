@@ -1,6 +1,18 @@
 import { TbRectangle } from "react-icons/tb";
 import { IoRemoveOutline } from "react-icons/io5";
 import { BiPointer } from "react-icons/bi";
+import { IoIosMenu } from "react-icons/io";
+import { FaRegCircle } from "react-icons/fa";
+import { BiSolidEraser } from "react-icons/bi";
+import { MdLightMode } from "react-icons/md";
+import { MdDarkMode } from "react-icons/md";
+import { HiMiniComputerDesktop } from "react-icons/hi2";
+
+
+
+
+
+import { LuDiamond } from "react-icons/lu";
 
 import { IoIosUndo } from "react-icons/io";
 import { IoIosRedo } from "react-icons/io";
@@ -16,13 +28,14 @@ import "./App.css";
 const generator = rough.generator();
 
 function createElement(id, x1, y1, x2, y2, type) {
+
   switch (type) {
     case "line":
     case "rectangle":
       const roughElement = type === "line"
         ? generator.line(x1, y1, x2, y2)
         : generator.rectangle(x1, y1, x2 - x1, y2 - y1);
-      return { id, x1, y1, x2, y2, type, roughElement};
+      return { id, x1, y1, x2, y2, type, roughElement };
     case "pencil":
 
       return { id, type, points: [{ x: x1, y: y1 }] }
@@ -113,7 +126,7 @@ const cursorForPosition = (position) => {
     case "bl":
       return "nesw-resize";
     default:
-      return "pointer";
+      return "move";
   }
 };
 const resizedCordinates = (clientX, clientY, position, coordinates) => {
@@ -180,7 +193,7 @@ const drawElement = (roughCanvas, context, element) => {
       break;
     case "pencil":
       const stroke = getSvgPathFromStroke(getStroke(element.points,
-        { size: 8 }))
+        { size: 6 }))
       context.fill(new Path2D(stroke));
       break;
     case "text":
@@ -224,13 +237,15 @@ const usePressedkeys = () => {
 const App = () => {
   const [elements, setElements, undo, redo] = useHistory([]);
   const [action, setAction] = useState("none");
-  const [tool, setTool] = useState("pencil");
+  const [tool, setTool] = useState("none");
+  const [color, setColor] = useState('#ffffff');
+  const colors = ['rgb(241 245 249)', 'rgb(254 226 226)', 'rgb(255 237 213)','rgb(250 232 255)', 'rgb(219 234 254)' ];
   const [panOffset, setPanOffset] = React.useState({ x: 0, y: 0 });
   const [startPanMousePosition, setStartPanMousePosition] = React.useState({ x: 0, y: 0 });
   const [selectedElement, setSelectedElement] = useState(null);
-  const [scale, setScale] =React.useState(1);
-  const [scaleOffet, setScaleOffset] =React.useState({x :0, y:0});
-
+  const [scale, setScale] = React.useState(1);
+  const [activeSection, setActiveSection] = useState(null);
+  const [scaleOffet, setScaleOffset] = React.useState({ x: 0, y: 0 });
   const textAreaRef = useRef();
   const canvasRef = useRef(null);
   const pressedKeys = usePressedkeys();
@@ -244,13 +259,13 @@ const App = () => {
 
     const scaleWidth = canvas.width * scale;
     const scaleHeight = canvas.height * scale;
-    const scaleOffsetX = (scaleWidth - canvas.width)/2;
-    const scaleOffsetY = (scaleHeight - canvas.height) /2;
-    setScaleOffset({x: scaleOffsetX, y : scaleOffsetY})
+    const scaleOffsetX = (scaleWidth - canvas.width) / 2;
+    const scaleOffsetY = (scaleHeight - canvas.height) / 2;
+    setScaleOffset({ x: scaleOffsetX, y: scaleOffsetY })
 
     context.save();
     context.translate(panOffset.x * scale - scaleOffsetX, panOffset.y * scale - scaleOffsetY);
-    
+
     context.scale(scale, scale);
 
     elements.forEach(element => {
@@ -278,12 +293,12 @@ const App = () => {
   }, [undo, redo]);
   useEffect(() => {
     const panOrZoomFunction = event => {
-      if(pressedKeys.has("Meta") || pressedKeys.has("Control")) onZoom(event.deltaY * -0.01);
+      if (pressedKeys.has("Meta") || pressedKeys.has("Control")) onZoom(event.deltaY * -0.01);
       else
-      setPanOffset(prevState => ({
-        x: prevState.x - event.deltaX,
-        y: prevState.y - event.deltaY
-      }));
+        setPanOffset(prevState => ({
+          x: prevState.x - event.deltaX,
+          y: prevState.y - event.deltaY
+        }));
     };
     document.addEventListener("wheel", panOrZoomFunction);
     return () => {
@@ -301,6 +316,9 @@ const App = () => {
     }
   }, [action, selectedElement]);
 
+  const handleSetBgCanvas = (index) => {
+    setColor(colors[index]);
+  };
   const updateElement = (id, x1, y1, x2, y2, type, options) => {
     const elementsCopy = [...elements];
 
@@ -369,7 +387,13 @@ const App = () => {
           setAction("resizing");
         }
       }
-    } else {
+    } else if (tool === "eraser") {
+      const element = getElementAPosition(clientX, clientY, elements);
+      if (element) {
+        setElements(elements.filter(el => el.id !== element.id));
+      }
+    }
+    else {
       const id = elements.length;
       const element = createElement(
         id,
@@ -402,7 +426,14 @@ const App = () => {
       const element = getElementAPosition(clientX, clientY, elements);
       event.target.style.cursor = element
         ? cursorForPosition(element.position)
-        : "default";
+        : "pointer";
+    } else if (tool === "eraser") {
+      event.target.style.cursor = `grab`;
+    } else {
+      const element = getElementAPosition(clientX, clientY, elements);
+      event.target.style.cursor = element
+        ? "crosshair"
+        : "crosshair";
     }
 
     if (action === "drawing") {
@@ -479,7 +510,7 @@ const App = () => {
     let link = event.currentTarget;
     link.setAttribute("download", "canvas.png");
     let image = canvasRef.current.toDataURL('image/png');
-    link.setAttribute( 'href', image );
+    link.setAttribute('href', image);
 
   }
 
@@ -496,10 +527,19 @@ const App = () => {
           setTool("rectangle");
           break;
         case "4":
-          setTool("pencil");
+          setTool("diamond");
           break;
         case "5":
+          setTool("circle");
+          break;
+        case "6":
+          setTool("pencil");
+          break;
+        case "7":
           setTool("text");
+          break;
+        case "0":
+          setTool("eraser");
           break;
         default:
           break;
@@ -512,51 +552,97 @@ const App = () => {
     };
   }, []);
   const toolClass = (selectedTool) => {
-    return tool === selectedTool ? "bg-teal-200 text-teal-700 shadow-lg rounded-sm" : "";
+    return tool === selectedTool ? "bg-teal-200 text-teal-800 shadow-lg rounded-sm" : "";
+  };
+  const handleMenuClick = (section) => {
+    setActiveSection(section);
   };
 
   return (
     <div>
-      <div className="fixed top-0 left-1/3 right-1/3 z-20 px-4 py-2">
-        <div className="toolbar links flex justify-center items-center  bg-slate-50 gap-7 py-2 px-5 w-fit mx-auto border shadow-lg rounded-lg">
+      <div className="fixed top-0 w-full flex justify-self-center items-center z-20 px-4 py-2">
+        <button className="bg-teal-200 text-teal-800 shadow-sm rounded-md border p-1" onClick={() => handleMenuClick("menu")} >
+          <IoIosMenu size={"1.2rem"} />
+        </button>
+        <div className="toolbar links flex justify-center items-center bg-slate-50 gap-7 py-3 px-5 w-fit mx-auto border shadow-sm rounded-lg">
           <a className={toolClass("selection")} onClick={() => setTool("selection")} >
-            <BiPointer size={"1.2rem"} />
-            <span className="absolute ml-5 top-7 text-xxs">1</span>
+            <BiPointer size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">1</span>
           </a>
           <a className={toolClass("line")} onClick={() => setTool("line")}>
-          <IoRemoveOutline size={"1.3rem"} />
-            <span className="absolute ml-5 top-7 text-xxs">2</span>
+            <IoRemoveOutline size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">2</span>
           </a>
           <a className={toolClass("rectangle")} onClick={() => setTool("rectangle")}>
-            <TbRectangle size={"1.3rem"} />
-            <span className="absolute ml-5 top-7 text-xxs">3</span>
+            <TbRectangle size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">3</span>
           </a>
+          <a className={toolClass("diamond")} onClick={() => setTool("diamond")}>
+            <LuDiamond size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">4</span>
+          </a>
+          <a className={toolClass("circle")} onClick={() => setTool("circle")}>
+            <FaRegCircle size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">5</span>
+          </a>
+
+
           <a className={toolClass("pencil")} onClick={() => setTool("pencil")}>
-            <FaPencil size={"1.3rem"} />
-            <span className="absolute ml-5 top-7 text-xxs">4</span>
+            <FaPencil size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">6</span>
           </a>
           <a className={toolClass("text")} onClick={() => setTool("text")}>
-            <PiTextTBold size={"1.3rem"} />
-            <span className="absolute ml-5 top-7 text-xxs">5</span>
+            <PiTextTBold size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">7</span>
+          </a>
+          <a className={toolClass("eraser")} onClick={() => setTool("eraser")}>
+            <BiSolidEraser size={"1rem"} />
+            <span className="text-slate-400 absolute ml-4 top-7 text-xxs">0</span>
           </a>
           <a href="download_link" onClick={saveImageToLocal} className="color: #f1f5f9;">
-          <HiOutlineDownload size={"1.3rem"} /></a>
-          
+            <HiOutlineDownload size={"1rem"} /></a>
+        </div>
+        <button className="bg-teal-200 text-xs text-teal-800 shadow-sm rounded-md border px-2 " onClick={() => setTool("share")} >
+          Share
+        </button>
+      </div>
+      <div className="w-60 fixed left-0 top-10 my-6 mx-3 px-2 flex flex-col gap-2 rounded-lg border shadow-lg bg-white z-20">
+      <div className="w-full relative  flex justify-between items-center bg-white py-3 px-3 w-fit mx-auto rounded-lg">
+          <span className="text-md">Theme</span>
+          <div className="flex justify-center items-center mt-2 bg-teal-200 text-teal-800  rounded-md border">
+            <button className="bg-teal-200 px-1 py-1" onClick={() => handleSetBgCanvas(3)}><MdLightMode size={"1rem"}/></button>
+            <button className="bg-teal-200 px-1 py-1 " onClick={() => handleSetBgCanvas(4)}><MdDarkMode size={"1rem"}/></button>
+            <button className="bg-teal-200 px-1 py-1" onClick={() => handleSetBgCanvas(4)}><HiMiniComputerDesktop size={"1rem"}/></button>
+          </div>
+        </div>
+        <hr className="w-56"/>
 
-
+        <div className="w-full relative flex justify-center items-center bg-white py-3 px-3 mx-auto rounded-lg">
+          <span className="absolute text-sm top-0 left-0">Canvas Background</span>
+          <div className="gap-1 flex justify-center items-center content-between mt-4">
+            <button className="bg-slate-100 border-slate-400 rounded-md" onClick={() => handleSetBgCanvas(0)}></button>
+            <button className="bg-red-100 border-slate-400 rounded-md" onClick={() => handleSetBgCanvas(1)}></button>
+            <button className="bg-orange-100  border-slate-400 rounded-md" onClick={() => handleSetBgCanvas(2)}></button>
+            <button className="bg-fuchsia-100  border-slate-400 rounded-md" onClick={() => handleSetBgCanvas(3)}></button>
+            <button className="bg-blue-100  border-slate-400 rounded-md" onClick={() => handleSetBgCanvas(4)}></button>
+          </div>
         </div>
       </div>
-      <div className="fixed bottom-0  flex justify-center items-center gap-2 z-20 py-2 px-2">
-        <button onClick={() =>onZoom(-0.1) }>-</button>
-        <span onClick={() =>setScale(1) }>{new Intl.NumberFormat("dn-GB", {style: "percent"}).format(scale)}</span>
-        <button onClick={() =>onZoom(+0.1) }>+</button>
-        <span> </span>
-        <button onClick={undo}>
-          <IoIosUndo size={"1.3rem"} />
-        </button>
-        <button onClick={redo}>
-          <IoIosRedo size={"1.3rem"} />
-        </button>
+      <div className="fixed bottom-0  flex justify-center items-center gap-2 z-20 pb-2 pl-2">
+        <div className="bg-teal-200 text-xs text-teal-800 shadow-sm rounded-md border">
+          <button className="bg-teal-200  text-teal-800" onClick={() => onZoom(-0.1)}>-</button>
+          <span onClick={() => setScale(1)}> {new Intl.NumberFormat("dn-GB", { style: "percent" }).format(scale)} </span>
+          <button className="bg-teal-200  text-teal-800 rounded-md" onClick={() => onZoom(+0.1)}>+</button>
+        </div>
+
+        <div className="bg-teal-200 text-teal-800 shadow-sm rounded-md border">
+          <button className="bg-teal-200 text-teal-800  rounded-md border" onClick={undo}>
+            <IoIosUndo size={"1rem"} />
+          </button>
+          <button className="bg-teal-200 text-teal-800  rounded-md border" onClick={redo}>
+            <IoIosRedo size={"1rem"} />
+          </button>
+        </div>
       </div>
       {action === "writing" ? (
         <textarea
@@ -585,7 +671,7 @@ const App = () => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        style={{ position: "absolute", zIndex: 0 }}
+        style={{ position: "absolute", zIndex: 0, backgroundColor: color }}
       >
         Canvas
       </canvas>

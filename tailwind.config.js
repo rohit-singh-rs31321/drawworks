@@ -7,6 +7,13 @@ export default {
   theme: {
     extend: {},
   },
-  plugins: [],
+  plugins: [
+    function ({addBase, config}){
+      addBase ({
+        'button': {'appearance': 'none'},
+
+      })
+    }
+  ],
 }
 
